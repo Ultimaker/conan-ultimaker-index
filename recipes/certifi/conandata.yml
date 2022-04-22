@@ -1,9 +1,4 @@
 "sources":
-  "1.0.1":
-    "Any":
-      "3.0":
-        "sha256": "44964ac783fca598e723da5fa2ef3631b5b2f94f445749bfc6043d4afb20de75"
-        "url": "https://files.pythonhosted.org/packages/4e/58/86422944e1f228a4e90c291388bf69675826c995f163b2894541365f1f0e/certifi-1.0.1-py2.py3-none-any.whl"
   "2015.04.28":
     "Any":
       "3.0":
