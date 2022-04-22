@@ -24,12 +24,13 @@ jobs:
     - id: files
       name: Get changed files
       uses: jitterbit/get-changed-files@v1
-    - name: Setup Python and Conan
+    - name: Setup Python and pip
       uses: actions/setup-python@v3
       with:
         python-version: '3.10.4'
         architecture: 'x64'
         cache: 'pip'
+    - name: Export Packages
       run: |
         export CONAN_V2_MODE=1
         pip install --require-hashes -r requirements.txt
