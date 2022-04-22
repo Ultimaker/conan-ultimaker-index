@@ -1,0 +1,2 @@
+conan==1.47.0 \
+    --hash=sha256:c0f066be1871ae23a9dbe7465929ae38f221531b7025f85cdd56d4790c1816be

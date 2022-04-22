@@ -1,0 +1,40 @@
+---
+name: conan-export
+on:
+  push:
+    paths:
+      - 'recipes/**'
+    branches:
+      - main
+      - dev
+      - 'CURA-*'
+  pull_request:
+    branches:
+      - main
+      - dev
+env:
+  CONAN_USER: ${{ secrets.Conan.CONAN_USER }}
+  CONAN_PASS: ${{ secrets.Conan.CONAN_PASS }}
+jobs:
+  export-recipe:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout Cura
+      uses: actions/checkout@v3
+    - id: files
+      name: Get changed files
+      uses: jitterbit/get-changed-files@v1
+    - name: Setup Python and Conan
+      uses: actions/setup-python@v3
+      with:
+        python-version: '3.10.4'
+        architecture: 'x64'
+        cache: 'pip'
+      run: |
+        export CONAN_V2_MODE=1
+        pip install --require-hashes -r requirements.txt
+        conan config install https://github.com/Ultimaker/conan-config/archive/refs/heads/CURA-9177_Fix_CI_CD.zip
+        conan profile new default --detect
+        conan user -p ${{ env.CONAN_PASS }} -r ultimaker ${{ env.CONAN_USER }}
+        python scripts/export_all.py ultimaker ${{ github.ref_name }} ${{ steps.files.outputs.all }}
+        conan upload "*" -r ultimaker --all -c
