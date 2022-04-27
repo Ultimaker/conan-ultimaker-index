@@ -4,6 +4,7 @@ from io import StringIO
 import os
 import re
 import textwrap
+from jinja2 import Template
 
 required_conan_version = ">=1.33.0"
 
@@ -15,7 +16,7 @@ class CPythonConan(ConanFile):
     description = "Python is a programming language that lets you work quickly and integrate systems more effectively."
     topics = ("python", "cpython", "language", "script")
     license = ("Python-2.0",)
-    exports_sources = "patches/**"
+    exports_sources = "patches/**", "cmake/**"
     settings = "os", "arch", "compiler", "build_type"
     options = {
         "shared": [True, False],
@@ -569,6 +570,20 @@ class CPythonConan(ConanFile):
                 os.symlink("python{}".format(self._version_suffix), self._cpython_symlink)
         self._fix_install_name()
 
+        with open(os.path.join("cmake", "python_variable.cmake.jinja"), "r") as f:
+            template = Template(f.read())
+            template.render(python_executable=self._cpython_interpreter_path,
+                            python_stdlib=,
+                            python_stdarch=,
+                            python_sitelib=,
+                            python_sitesearch=,
+                            python_soabi=,
+                            python_version=,
+                            python_version_major=,
+                            python_version_minor=,
+                            python_version_patch=)
+
+
     @property
     def _cpython_symlink(self):
         symlink = os.path.join(self.package_folder, "bin", "python")
@@ -634,6 +649,9 @@ class CPythonConan(ConanFile):
         # self.cpp_info.names["cmake_find_package"] = "Python"
         # self.cpp_info.names["cmake_find_package_multi"] = "Python"
         # FIXME: conan components need to generate multiple .pc files (python2, python-27)
+        self.cpp_info.components["python"].set_property("cmake_file_name", "Python")
+        self.cpp_info.components["python"].set_property("cmake_target_name", "Python::Python")
+        self.cpp_info.components["python"].set_property("cmake_build_modules", [os.path.join("lib", "python_variables.cmake")])
 
         py_version = tools.Version(self._version_number_only)
         # python component: "Build a C extension for Python"
