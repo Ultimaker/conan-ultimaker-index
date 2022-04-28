@@ -2,13 +2,17 @@ import os
 
 from conan import ConanFile
 from conan.tools.env import VirtualRunEnv
+from conan.tools.env.environment import EnvVars, register_env_script
+from conans.client.subsystems import deduce_subsystem
 
+from conans.util.files import save
 
 class PythonVirtualEnvironment(object):
     def __init__(self, conanfile: ConanFile):
         self._conanfile = conanfile
         self._python_interpreter = None
         self._requirements_txt = None
+        self._use_env_file = None
 
     @property
     def _site_packages_path(self):
@@ -22,11 +26,27 @@ class PythonVirtualEnvironment(object):
             return "Scripts"
         return "bin"
 
-    def configure(self, python_interpreter, requirements_txt = None):
+    def _create_env_file_script(self, envvars: EnvVars, filename, env_variable):
+        file_path = os.path.join(self._conanfile.generators_folder, filename)
+        subsystem = deduce_subsystem(self._conanfile, envvars._scope)
+        result = []
+        for varname, varvalues in envvars._values.items():
+            value = varvalues.get_str("${name}", subsystem, pathsep = envvars._pathsep)
+            value = value.replace('"', '\\"')
+            if value:
+                result.append('echo "{}={}" >> {}'.format(varname, value, env_variable))
+
+        content = "\n".join(result)
+        save(file_path, content)
+        if envvars._scope:
+            register_env_script(self._conanfile, file_path, envvars._scope)
+
+    def configure(self, python_interpreter, requirements_txt = None, use_env_file = None):
         if not self._conanfile.should_configure:
             return
         if requirements_txt:
             self._requirements_txt = requirements_txt
+        self._use_env_file = use_env_file
 
         self._python_interpreter = python_interpreter
 
@@ -50,6 +70,8 @@ class PythonVirtualEnvironment(object):
         env.define("PS1", f"({self._conanfile.name}) ${{PS1:-}}")
         envvars = env.vars(self._conanfile)
         envvars.save_script(f"{self._conanfile.name}")
+        if self._use_env_file:
+            self._create_env_file_script(envvars, f"env_{self._conanfile.name}.sh", self._use_env_file)
 
         # install the requirements
         if self._requirements_txt:
@@ -67,4 +89,4 @@ class PythonVirtualEnvironment(object):
 
 class Pkg(ConanFile):
     name = "PythonVirtualEnvironment"
-    version = "0.2.0"
+    version = "0.2.1"
