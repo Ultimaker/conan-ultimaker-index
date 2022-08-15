@@ -1,0 +1,7 @@
+"sources":
+  "6.2.3":
+    "sha256": "a9bfcac198fe4b703706f809bb686c7cef5f60a7c802fc145c6b57929c7a6a34"
+    "url": "https://files.pythonhosted.org/packages/45/d6/36df7171a4cb00580a608bd92ce085f05fff5e04a74eeac0c52d7de0a584/PyQt6-6.2.3.tar.gz"
+  "6.3.1":
+    "sha256": "8cc6e21dbaf7047d1fc897e396ccd9710a12f2ef976563dad65f06017d2c9757"
+    "url": "https://files.pythonhosted.org/packages/a3/ab/c5989de70eceed91abf5f828d99817462ff75f41558e9f5a6f5213f0932c/PyQt6-6.3.1.tar.gz"
