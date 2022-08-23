@@ -1,13 +1,10 @@
-import sys
-from io import StringIO
+import os
 from pathlib import Path
 
 from conan import ConanFile
-from conan.tools.files import files, AutoPackager
-from conan.tools.layout import basic_layout
-from conan.tools.env import VirtualRunEnv
-from conans.errors import ConanException
-from conans.tools import Version, chdir
+from conan.tools.files import files, replace_in_file
+from conan.tools.layout import cmake_layout
+from conans.tools import chdir, vcvars
 
 from jinja2 import Template
 
@@ -16,38 +13,33 @@ required_conan_version = ">=1.33.0"
 
 class PyQt6Conan(ConanFile):
     name = "pyqt6"
-    description = "The subset of a Qt installation needed by PyQt6."
+    author = "Riverbank Computing Limited"
+    description = "Python bindings for the Qt cross platform application toolkit"
     topics = ("conan", "python", "pypi", "pip")
     license = "LGPL v3"
     homepage = "https://www.riverbankcomputing.com/software/pyqt/"
     url = "https://www.riverbankcomputing.com/software/pyqt/"
     settings = "os", "compiler", "build_type", "arch"
     build_policy = "missing"
+
+    python_requires = "pyprojecttoolchain/[>=0.1.6]@ultimaker/stable", "sipbuildtool/[>=0.2.2]@ultimaker/stable"
+
     options = {
         "shared": [True, False],
-        "fPIC": [True, False]
+        "fPIC": [True, False],
+        "py_build_requires": ["ANY"],
+        "py_build_backend": ["ANY"],
     }
     default_options = {
         "shared": True,
-        "fPIC": True
+        "fPIC": True,
+        "py_build_requires": '"sip >=6.5, <7", "PyQt-builder >=1.11, <2", "PyQt6-sip >=13.4, <14"',
+        "py_build_backend": "sipbuild.api",
     }
 
-    @property
-    def _venv_base_path(self):
-        return Path(self.folders.generators_folder, "venv")
-
-    @property
-    def _venv_bin_path(self):
-        is_windows = self.settings.os == "Windows"
-        return Path(self._venv_base_path, "Scripts" if is_windows else "bin")
-
-    @property
-    def _source_folder(self):
-        return "src"
-
     def layout(self):
-        basic_layout(self, src_folder = self._source_folder)
-        self.folders.generators = Path("generators")
+        cmake_layout(self)
+        self.folders.source = "source"
 
     def requirements(self):
         self.requires("cpython/3.10.4")
@@ -61,109 +53,55 @@ class PyQt6Conan(ConanFile):
         self.requires("expat/2.4.1")
 
     def configure(self):
-        self.options["qt"].shared = self.options.shared
         self.options["cpython"].shared = self.options.shared
+        self.options["qt"].shared = self.options.shared
+
+        # Disbabled harfbuzz and glib for now since these require the use of a bash such as msys2. If we still need
+        # these libraries. We should fix these recipes such that they don't use automake and autoconf on Windows and
+        # add the configure option: `-o msys2:packages=base-devel,binutils,gcc,autoconf,automake`
+        # These recipes are older version and don't handle the the run/build environment and the win_bash config options
+        # well. Preinstalling these packages is a quick and dirty solution but a viable one due to the time constraints
+        self.options["qt"].with_harfbuzz = False
+        self.options["qt"].with_glib = False
 
     def source(self):
         sources = self.conan_data["sources"][self.version]
         files.get(self, **sources, strip_root = True)
 
-        pyproject_toml_location = Path(self.folders.source_folder).joinpath("pyproject.toml")
-        with open(pyproject_toml_location, "r") as f:
-            pyproject_toml = f.read()
-
-        tool_sip_project = Template(r"""[tool.sip.project]
-py-pylib-lib = "{{ python_lib_path }}"
-py-include-dir = "{{ python_include_path }}/python{{ python_major_version }}.{{ python_minor_version }}"
-py-major-version = {{ python_major_version }}
-py-minor-version = {{ python_minor_version }}""")
-
-        python_dep = self.dependencies["cpython"]
-        python_version = Version(python_dep.ref.version)
-        python_lib_path = python_dep.cpp_info.libdirs[0]
-        python_include_path = python_dep.cpp_info.includedirs[0]
-
-        pyproject_toml += tool_sip_project.render(python_lib_path = python_lib_path,
-                                                  python_include_path = python_include_path,
-                                                  python_major_version = python_version.major,
-                                                  python_minor_version = python_version.minor)
-
-        with open(pyproject_toml_location, "w") as f:
-            f.write(pyproject_toml)
+        # Might be a bug in PyQt-builder but the option link-full-dll isn't available, even though it is set in the
+        # module pyqtbuild\project.py. A simple hack is to add `self.link_full_dll = True` to the project such that
+        # we don't link against the limited Python ABI but against the full python<major><minor> ABI
+        replace_in_file(self, Path(self.source_folder, "project.py"), "def apply_user_defaults(self, tool):", """def apply_user_defaults(self, tool):
+        self.link_full_dll = True
+        """)
 
     def generate(self):
-        vr = VirtualRunEnv(self)
-        vr.generate()
+        # Generate the pyproject.toml and override the shipped pyproject.toml, This allows us to link to our CPython
+        # lib
+        pp = self.python_requires["pyprojecttoolchain"].module.PyProjectToolchain(self)
+        pp.blocks["tool_sip_metadata"].values["name"] = "PyQt6"
+        pp.blocks["tool_sip_metadata"].values["description_file"] = "README"
+
+        # The following setting keys and blocks are not used by PyQt6, we should remove these
+        pp.blocks["tool_sip_project"].values["sip_files_dir"] = None
+        pp.blocks.remove("tool_sip_bindings")
+        pp.blocks.remove("extra_sources")
+        pp.blocks.remove("compiling")
+
+        pp.generate()
 
     def build(self):
-        python_interpreter = Path(self.deps_user_info["cpython"].python)
+        # The vcvars context should have no effect on non-windows operating systems (We should however still look at how
+        # this behaves on Windows when we use a different compiler such as Clang
+        with chdir(self.source_folder):
+            with vcvars(self):
 
-        # Create the virtual Python env and install the build tools: sip, PyQt6-sip and PyQt-builder (make sure these are build against the
-        # CPython dep
-        # When on Windows execute as Windows Path
-        if self.settings.os == "Windows":
-            python_interpreter = Path(*[f'"{p}"' if " " in p else p for p in python_interpreter.parts])
-
-        # Create the virtual environment
-        self.run(f"""{python_interpreter} -m venv {self._venv_base_path}""", env = "conanbuild")
-
-        # Make sure there executable is named the same on all three OSes this allows it to be called with `python`
-        # simplifying GH Actions steps
-        if self.settings.os != "Windows":
-            python_venv_interpreter = Path(self.build_folder, self._venv_bin_path, "python")
-            if not python_venv_interpreter.exists():
-                python_venv_interpreter.hardlink_to(Path(self.build_folder, self._venv_bin_path,
-                                                              Path(sys.executable).stem + Path(sys.executable).suffix))
-        else:
-            python_venv_interpreter = Path(self.build_folder, self._venv_bin_path,
-                                                Path(sys.executable).stem + Path(sys.executable).suffix)
-
-        if not python_venv_interpreter.exists():
-            raise ConanException(f"Virtual environment Python interpreter not found at: {python_venv_interpreter}")
-        if self.settings.os == "Windows":
-            python_venv_interpreter = Path(*[f'"{p}"' if " " in p else p for p in python_venv_interpreter.parts])
-
-        buffer = StringIO()
-        outer = '"' if self.settings.os == "Windows" else "'"
-        inner = "'" if self.settings.os == "Windows" else '"'
-        self.run(
-            f"{python_venv_interpreter} -c {outer}import sysconfig; print(sysconfig.get_path({inner}purelib{inner})){outer}",
-            env = "conanrun",
-            output = buffer)
-        pythonpath = buffer.getvalue().splitlines()[-1]
-
-        env = VirtualRunEnv(self)
-        run_env = env.environment()
-
-        run_env.define_path("VIRTUAL_ENV", str(self._venv_base_path))
-        run_env.prepend_path("PATH", str(self._venv_bin_path))
-        run_env.prepend_path("PYTHONPATH", str(pythonpath))
-        run_env.unset("PYTHONHOME")
-
-        envvars = run_env.vars(self, scope = "run")
-
-        with envvars.apply():
-            # Install some base_packages
-            self.run(f"""{python_venv_interpreter} -m pip install wheel setuptools""", run_environment = True, env = "run")
-
-            # Install sip PyQt6-sip PyQt-builder in the newly created virtual python env # TODO: pin versions and make it future proof
-            self.run(f"""{python_venv_interpreter} -m pip install sip \"PyQt6-sip<=13.2.1\" \"PyQt-builder<=1.12.2\" --no-binary :all: --upgrade""",
-                     run_environment = True, env = "run")
-
-            sip_install_executable = Path(self._venv_bin_path, "sip-install")
-            if self.settings.os == "Windows":
-                sip_install_executable = Path(*[f'"{p}"' if " " in p else p for p in sip_install_executable.parts])
-
-            with chdir(self.folders.source_folder):
-                self.run(f"""{sip_install_executable} --verbose --build-dir {self.folders.build_folder} --target-dir {self.folders.package_folder} --no-tools --qt-shared --confirm-license --no-dbus-python""",
-                         run_environment = True, env = "run")
-
-        files.rmdir(self._venv_base_path)
-
+                # self.run(f"""sip-install --pep484-pyi --verbose --no-tools --qt-shared --confirm-license""", run_environment = True, env = "conanrun")
+                self.run(f"""sip-install --pep484-pyi --verbose --confirm-license""", run_environment = True, env = "conanrun")
 
     def package(self):
-        packager = AutoPackager(self)
-        packager.run()
-        # TODO: package pyd, pyi
-        # TODO: should we also add the PyQt6-sip as part of this package?
-        # self.copy("*", src = self._site_packages, dst = self._site_packages)
+        # already installed by our use of the `sip-install` command during build
+        pass
+
+    def package_info(self):
+        self.runenv_info.append_path("PYTHONPATH", os.path.join(self.package_folder, "site-packages"))
