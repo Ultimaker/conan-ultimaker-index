@@ -40,7 +40,7 @@ class ToolSipMetadataBlock(Block):
     home-page = "{{ url }}"
     author = "{{ author }}"
     license = "{{ license }}"
-    description-file = "README.md"
+    description-file = "{{ description_file }}"
     requires-python = ">={{ python_version }}"
     """)
 
@@ -69,7 +69,40 @@ class ToolSipMetadataBlock(Block):
             "url": self._conanfile.url,
             "author": self._conanfile.author,
             "license": self._conanfile.license,
+            "description_file":  "README.md",
             "python_version": python_version
+        }
+
+
+class ToolSipProjectPyQtBuilder(Block):
+    template = textwrap.dedent("""
+    {% if link_full_dll %}link-full-dll = true
+    {% endif %}py-pylib-dir = "{{ py_pylib_dir }}"
+    py-pylib-lib = "{{ py_pylib_lib }}"
+    {% if py_pylib_shlib is not none %}py-pylib-shlib = "{{ py_pylib_shlib }}"
+    {% endif %}qml-debug = {{ qml_debug | lower }}
+    """)
+
+    def context(self):
+        py_lib_dir = self._conanfile.options.get_safe("py_lib")
+        py_pylib_lib = self._conanfile.options.get_safe("py_lib")
+
+        if py_lib_dir is None:
+            try:
+                py_lib_dir = Path(self._conanfile.deps_cpp_info['cpython'].rootpath, self._conanfile.deps_cpp_info['cpython'].components["python"].bindirs[0]).as_posix()
+                py_lib = self._conanfile.deps_cpp_info['cpython'].libs[0]
+            except:
+                self._conanfile.output.warn(
+                    "No include directory set for Python.h, either add the options: 'py_include' of add cpython as a Conan dependency!")
+        else:
+            py_lib_dir = Path(py_lib_dir).as_posix()
+
+        return {
+            "link_full_dll": self._conanfile.settings.get_safe("os") == "Windows" and self._conanfile.options.get_safe("shared", True),
+            "py_pylib_dir": py_lib_dir,
+            "py_pylib_lib": py_lib,
+            "py_pylib_shlib": py_lib,
+            "qml_debug": self._conanfile.settings.get_safe("build_type", "Release") == "Debug"
         }
 
 
@@ -77,7 +110,7 @@ class ToolSipProjectBlock(Block):
     template = textwrap.dedent("""
     [tool.sip.project]
     compile = {{ compile | lower }}
-    sip-files-dir = "{{ sip_files_dir }}"
+    {% if sip_files_dir is not none %}sip-files-dir = "{{ sip_files_dir }}"{% endif %}
     build-dir = "{{ build_folder }}"
     target-dir = "{{ package_folder }}"
     {{ py_include_dir }}
@@ -88,6 +121,7 @@ class ToolSipProjectBlock(Block):
     def context(self):
         python_version = self._conanfile.options.get_safe("py_version")
         py_include_dir = self._conanfile.options.get_safe("py_include")
+        py_lib_dir = self._conanfile.options.get_safe("py_lib")
         py_major_version = None
         py_minor_version = None
 
@@ -106,8 +140,7 @@ class ToolSipProjectBlock(Block):
             if py_include_dir is None:
                 try:
                     py_include_dir = Path(self._conanfile.deps_cpp_info['cpython'].rootpath,
-                                          self._conanfile.deps_cpp_info['cpython'].includedirs[0],
-                                          f"python{py_major_version}.{py_minor_version}").as_posix()
+                                          self._conanfile.deps_cpp_info['cpython'].components["python"].includedirs[0]).as_posix()
                     py_include_dir = f"py-include-dir = \"{py_include_dir}\""
                 except:
                     self._conanfile.output.warn(
@@ -130,6 +163,7 @@ class ToolSipProjectBlock(Block):
             "build_folder": Path(self._conanfile.build_folder).as_posix(),
             "package_folder": package_folder,
             "py_include_dir": py_include_dir,
+            "py_lib_dir": py_lib_dir,
             "py_major_version": py_major_version,
             "py_minor_version": py_minor_version
         }
@@ -157,7 +191,7 @@ class ToolSipBindingBlockCompile(Block):
     def context(self):
         return {
             "compileargs": list(filter(lambda item: item is not None and item != '', self._toolchain.cxxflags)),
-            "linkargs":  list(filter(lambda item: item is not None and item != '', self._toolchain.ldflags)),
+            "linkargs": list(filter(lambda item: item is not None and item != '', self._toolchain.ldflags)),
         }
 
 
@@ -210,14 +244,21 @@ class PyProjectToolchain(AutotoolsToolchain):
     def __init__(self, conanfile: ConanFile, namespace = None):
         super().__init__(conanfile, namespace)
         check_using_build_profile(self._conanfile)
-        self.blocks = ToolchainBlocks(self._conanfile, self, [
+
+        blocks = [
             ("build_system", BuildSystemBlock),
             ("tool_sip_metadata", ToolSipMetadataBlock),
-            ("tool_sip_project", ToolSipProjectBlock),
-            ("tool_sip_bindings", ToolSipBindingsBlock),
-            ("extra_sources", ToolSipBindingsExtraSourcesBlock),
-            ("compiling", ToolSipBindingBlockCompile),
-        ])
+            ("tool_sip_project", ToolSipProjectBlock)]
+
+        if "PyQt-builder" in str(self._conanfile.options.get_safe("py_build_requires", "")):
+            blocks.append(("pyqt_builder", ToolSipProjectPyQtBuilder))
+
+        blocks.extend([("tool_sip_bindings", ToolSipBindingsBlock),
+                       ("extra_sources", ToolSipBindingsExtraSourcesBlock),
+                       ("compiling", ToolSipBindingBlockCompile),
+                       ])
+
+        self.blocks = ToolchainBlocks(self._conanfile, self, blocks)
 
     @property
     def _context(self):
@@ -242,6 +283,6 @@ class PyProjectToolchain(AutotoolsToolchain):
 
 class PyProjectToolchainPkg(ConanFile):
     name = "pyprojecttoolchain"
-    version = "0.1.5"
+    version = "0.1.6"
     default_user = "ultimaker"
     default_channel = "stable"
