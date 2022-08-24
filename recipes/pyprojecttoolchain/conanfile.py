@@ -84,12 +84,12 @@ class ToolSipProjectPyQtBuilder(Block):
     """)
 
     def context(self):
-        py_lib_dir = self._conanfile.options.get_safe("py_lib")
-        py_pylib_lib = self._conanfile.options.get_safe("py_lib")
+        py_lib = self._conanfile.options.get_safe("py_lib")
+        py_lib_dir = self._conanfile.options.get_safe("py_lib_dir")
 
         if py_lib_dir is None:
             try:
-                py_lib_dir = Path(self._conanfile.deps_cpp_info['cpython'].rootpath, self._conanfile.deps_cpp_info['cpython'].components["python"].bindirs[0]).as_posix()
+                py_lib_dir = Path(self._conanfile.deps_cpp_info['cpython'].rootpath, self._conanfile.deps_cpp_info['cpython'].components["python"].bindirs[0], "libs").as_posix()
                 py_lib = self._conanfile.deps_cpp_info['cpython'].libs[0]
             except:
                 self._conanfile.output.warn(
@@ -115,13 +115,11 @@ class ToolSipProjectBlock(Block):
     target-dir = "{{ package_folder }}"
     {{ py_include_dir }}
     {{ py_major_version }}
-    {{ py_minor_version }}
-    """)
+    {{ py_minor_version }}""")
 
     def context(self):
         python_version = self._conanfile.options.get_safe("py_version")
         py_include_dir = self._conanfile.options.get_safe("py_include")
-        py_lib_dir = self._conanfile.options.get_safe("py_lib")
         py_major_version = None
         py_minor_version = None
 
@@ -163,7 +161,6 @@ class ToolSipProjectBlock(Block):
             "build_folder": Path(self._conanfile.build_folder).as_posix(),
             "package_folder": package_folder,
             "py_include_dir": py_include_dir,
-            "py_lib_dir": py_lib_dir,
             "py_major_version": py_major_version,
             "py_minor_version": py_minor_version
         }
