@@ -132,8 +132,6 @@ class ToolSipProjectBlock(Block):
 
         if python_version is not None:
             py_version = Version(python_version)
-            py_major_version = py_version.major
-            py_minor_version = py_version.minor
 
             if py_include_dir is None:
                 try:
