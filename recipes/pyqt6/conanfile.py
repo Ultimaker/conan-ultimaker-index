@@ -41,7 +41,7 @@ class PyQt6Conan(ConanFile):
         self.folders.source = "source"
 
     def requirements(self):
-        self.requires("cpython/3.10.4@ultimaker/testing")
+        self.requires("cpython/3.10.4")
         self.requires(f"qt/{self.version}")
 
         # Overriding version conflicts of dependencies for cpython and qt
