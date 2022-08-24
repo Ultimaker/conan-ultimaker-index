@@ -4,9 +4,8 @@ from pathlib import Path
 from conan import ConanFile
 from conan.tools.files import files, replace_in_file
 from conan.tools.layout import cmake_layout
+from conan.tools.microsoft import VCVars, is_msvc
 from conans.tools import chdir, vcvars
-
-from jinja2 import Template
 
 required_conan_version = ">=1.33.0"
 
@@ -42,7 +41,7 @@ class PyQt6Conan(ConanFile):
         self.folders.source = "source"
 
     def requirements(self):
-        self.requires("cpython/3.10.4")
+        self.requires("cpython/3.10.4@ultimaker/testing")
         self.requires(f"qt/{self.version}")
 
         # Overriding version conflicts of dependencies for cpython and qt
@@ -69,13 +68,21 @@ class PyQt6Conan(ConanFile):
         files.get(self, **sources, strip_root = True)
 
         # Might be a bug in PyQt-builder but the option link-full-dll isn't available, even though it is set in the
-        # module pyqtbuild\project.py. A simple hack is to add `self.link_full_dll = True` to the project such that
-        # we don't link against the limited Python ABI but against the full python<major><minor> ABI
-        replace_in_file(self, Path(self.source_folder, "project.py"), "def apply_user_defaults(self, tool):", """def apply_user_defaults(self, tool):
-        self.link_full_dll = True
-        """)
+        # module pyqtbuild\project.py. A lot of sip definition files set the `use_limited_api` to `True` for the module
+        # Since we compile PyQt6 for a single application against our own Python version, we can set the
+        # `use_limited_api` to `False` this should stop the linker from linking against the limited Python ABI
+        # python3.lib. Because now the `Py_LIMITED_API` C preprocessor symbol is no longer used.
+        # Keep in mind that this is a quick and dirty hack, which allows us to link against the full
+        # python<major><minor> ABI.
+        if self.settings.os == "Windows":
+            for sip_file in Path(self.source_folder, "sip").glob("**/*.sip"):
+                replace_in_file(self, sip_file, "use_limited_api=True", "use_limited_api=False", strict = False)
 
     def generate(self):
+        if is_msvc(self):
+            ms = VCVars(self)
+            ms.generate(scope = "run")
+
         # Generate the pyproject.toml and override the shipped pyproject.toml, This allows us to link to our CPython
         # lib
         pp = self.python_requires["pyprojecttoolchain"].module.PyProjectToolchain(self)
@@ -91,13 +98,8 @@ class PyQt6Conan(ConanFile):
         pp.generate()
 
     def build(self):
-        # The vcvars context should have no effect on non-windows operating systems (We should however still look at how
-        # this behaves on Windows when we use a different compiler such as Clang
         with chdir(self.source_folder):
-            with vcvars(self):
-
-                # self.run(f"""sip-install --pep484-pyi --verbose --no-tools --qt-shared --confirm-license""", run_environment = True, env = "conanrun")
-                self.run(f"""sip-install --pep484-pyi --verbose --confirm-license""", run_environment = True, env = "conanrun")
+            self.run(f"""sip-install --pep484-pyi --verbose --confirm-license --no-tools""", run_environment = True, env = "conanrun")
 
     def package(self):
         # already installed by our use of the `sip-install` command during build
