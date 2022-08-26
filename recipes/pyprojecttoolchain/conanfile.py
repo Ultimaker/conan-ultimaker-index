@@ -135,8 +135,10 @@ class ToolSipProjectBlock(Block):
 
             if py_include_dir is None:
                 try:
+                    header_path = "" if self._conanfile.settings.os == "Windows" else f"python{py_version.major}.{py_version.minor}"
                     py_include_dir = Path(self._conanfile.deps_cpp_info['cpython'].rootpath,
-                                          self._conanfile.deps_cpp_info['cpython'].components["python"].includedirs[0]).as_posix()
+                                          self._conanfile.deps_cpp_info['cpython'].components["python"].includedirs[0],
+                                          header_path).as_posix()
                     py_include_dir = f"py-include-dir = \"{py_include_dir}\""
                 except:
                     self._conanfile.output.warn(
