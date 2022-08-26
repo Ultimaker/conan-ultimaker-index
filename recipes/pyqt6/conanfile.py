@@ -40,9 +40,6 @@ class PyQt6Conan(ConanFile):
         cmake_layout(self)
         self.folders.source = "source"
 
-    def build_requirements(self):
-        self.tool_requires(f"qt/{self.version}")
-
     def requirements(self):
         self.requires("cpython/3.10.4")
         self.requires(f"qt/{self.version}")
@@ -53,6 +50,10 @@ class PyQt6Conan(ConanFile):
         self.requires("libffi/3.2.1")
         self.requires("sqlite3/3.36.0")
         self.requires("expat/2.4.1")
+        # self.requires("harfbuzz/5.1.0")
+        # self.requires("vulkan-loader/1.3.221")
+        # self.requires("wayland/1.21.0")
+        self.requires("with_freetype")
 
     def configure(self):
         self.options["cpython"].shared = self.options.shared
@@ -65,6 +66,8 @@ class PyQt6Conan(ConanFile):
         self.options["qt"].qtnetworkauth = True
         self.options["qt"].qt3d = True
         self.options["qt"].qtquick3d = True
+        #self.options["qt"].with_vulkan = True  # TODO: check if vulkan is really needed
+        self.options["qt"].with_freetype = True
 
         # Disabled harfbuzz and glib for now since these require the use of a bash such as msys2. If we still need
         # these libraries. We should fix these recipes such that they don't use automake and autoconf on Windows and
@@ -110,7 +113,7 @@ class PyQt6Conan(ConanFile):
 
     def build(self):
         with chdir(self.source_folder):
-            self.run(f"""sip-install --pep484-pyi --verbose --confirm-license --no-tools""", run_environment=True)
+            self.run(f"""sip-install --pep484-pyi --verbose --confirm-license --no-tools""", run_environment=True, env="conanrun")
 
     def package(self):
         # already installed by our use of the `sip-install` command during build
