@@ -5,7 +5,7 @@ from conan import ConanFile
 from conan.tools.files import files, replace_in_file
 from conan.tools.layout import cmake_layout
 from conan.tools.microsoft import VCVars, is_msvc
-from conans.tools import chdir
+from conans.tools import chdir, vcvars
 
 required_conan_version = ">=1.33.0"
 
@@ -45,15 +45,16 @@ class PyQt6Conan(ConanFile):
         self.requires(f"qt/{self.version}")
 
         # Overriding version conflicts of dependencies for cpython and qt
-        self.requires("zlib/1.2.11")
-        self.requires("openssl/1.1.1l")
+        self.requires("zlib/1.2.12")
+        self.requires("openssl/1.1.1q")
         self.requires("libffi/3.2.1")
-        self.requires("sqlite3/3.36.0")
+        self.requires("sqlite3/3.39.2")
         self.requires("expat/2.4.1")
-        # self.requires("harfbuzz/5.1.0")
-        # self.requires("vulkan-loader/1.3.221")
-        # self.requires("wayland/1.21.0")
-        self.requires("with_freetype")
+        self.requires("harfbuzz/4.4.1")
+        self.requires("glib/2.73.2")
+        self.requires("vulkan-loader/1.3.216.0")
+        if self.settings.os == "Linux":
+            self.requires("wayland/1.21.0")
 
     def configure(self):
         self.options["cpython"].shared = self.options.shared
@@ -66,16 +67,17 @@ class PyQt6Conan(ConanFile):
         self.options["qt"].qtnetworkauth = True
         self.options["qt"].qt3d = True
         self.options["qt"].qtquick3d = True
-        #self.options["qt"].with_vulkan = True  # TODO: check if vulkan is really needed
+        self.options["qt"].with_vulkan = True  # TODO: check if vulkan is really needed
         self.options["qt"].with_freetype = True
+        self.options["qt"].with_doubleconversion = True
 
         # Disabled harfbuzz and glib for now since these require the use of a bash such as msys2. If we still need
         # these libraries. We should fix these recipes such that they don't use automake and autoconf on Windows and
         # add the configure option: `-o msys2:packages=base-devel,binutils,gcc,autoconf,automake`
         # These recipes are older version and don't handle the run/build environment and the win_bash config options
         # well. Preinstalling these packages is a quick and dirty solution but a viable one due to the time constraints
-        self.options["qt"].with_harfbuzz = False
-        self.options["qt"].with_glib = False
+        self.options["qt"].with_harfbuzz = True
+        self.options["qt"].with_glib = True
 
     def source(self):
         sources = self.conan_data["sources"][self.version]
@@ -93,9 +95,9 @@ class PyQt6Conan(ConanFile):
                 replace_in_file(self, sip_file, "use_limited_api=True", "use_limited_api=False", strict = False)
 
     def generate(self):
-        if is_msvc(self):
-            ms = VCVars(self)
-            ms.generate(scope = "build")
+        # if is_msvc(self):
+        #     ms = VCVars(self)
+        #     ms.generate(scope = "gmake_build")
 
         # Generate the pyproject.toml and override the shipped pyproject.toml, This allows us to link to our CPython
         # lib
@@ -112,8 +114,9 @@ class PyQt6Conan(ConanFile):
         pp.generate()
 
     def build(self):
-        with chdir(self.source_folder):
-            self.run(f"""sip-install --pep484-pyi --verbose --confirm-license --no-tools""", run_environment=True, env="conanrun")
+        with vcvars(self):
+            with chdir(self.source_folder):
+                self.run(f"""sip-install --pep484-pyi --verbose --confirm-license --no-tools""", run_environment=True, env="conanrun")
 
     def package(self):
         # already installed by our use of the `sip-install` command during build
