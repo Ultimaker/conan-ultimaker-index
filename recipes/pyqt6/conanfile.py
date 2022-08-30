@@ -12,6 +12,7 @@ required_conan_version = ">=1.33.0"
 
 class PyQt6Conan(ConanFile):
     name = "pyqt6"
+    version = "6.3.1"
     author = "Riverbank Computing Limited"
     description = "Python bindings for the Qt cross platform application toolkit"
     topics = ("conan", "python", "pypi", "pip")
@@ -42,7 +43,7 @@ class PyQt6Conan(ConanFile):
 
     def requirements(self):
         self.requires("cpython/3.10.4")
-        self.requires(f"qt/{self.version}")
+        self.requires(f"qt/{self.version}@ultimaker/testing")
 
         # Overriding version conflicts of dependencies for cpython and qt
         self.requires("zlib/1.2.12")
@@ -52,6 +53,7 @@ class PyQt6Conan(ConanFile):
         self.requires("expat/2.4.1")
         self.requires("harfbuzz/4.4.1")
         self.requires("glib/2.73.2")
+        self.requires("pcre2/10.40")
         self.requires("vulkan-loader/1.3.216.0")
         if self.settings.os == "Linux":
             self.requires("wayland/1.21.0")
@@ -68,7 +70,7 @@ class PyQt6Conan(ConanFile):
         self.options["qt"].qt3d = True
         self.options["qt"].qtquick3d = True
         self.options["qt"].with_vulkan = True  # TODO: check if vulkan is really needed
-        self.options["qt"].with_freetype = True
+        self.options["qt"].with_freetype = False
         self.options["qt"].with_doubleconversion = True
 
         # Disabled harfbuzz and glib for now since these require the use of a bash such as msys2. If we still need
@@ -76,8 +78,8 @@ class PyQt6Conan(ConanFile):
         # add the configure option: `-o msys2:packages=base-devel,binutils,gcc,autoconf,automake`
         # These recipes are older version and don't handle the run/build environment and the win_bash config options
         # well. Preinstalling these packages is a quick and dirty solution but a viable one due to the time constraints
-        self.options["qt"].with_harfbuzz = True
-        self.options["qt"].with_glib = True
+        self.options["qt"].with_harfbuzz = False
+        self.options["qt"].with_glib = False
 
     def source(self):
         sources = self.conan_data["sources"][self.version]
