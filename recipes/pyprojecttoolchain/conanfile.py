@@ -110,7 +110,8 @@ class ToolSipProjectBlock(Block):
     template = textwrap.dedent("""
     [tool.sip.project]
     compile = {{ compile | lower }}
-    {% if sip_files_dir is not none %}sip-files-dir = "{{ sip_files_dir }}"{% endif %}
+    {% if sip_files_dir is not none %}sip-files-dir = "{{ sip_files_dir }}"
+    {% endif %}
     build-dir = "{{ build_folder }}"
     target-dir = "{{ package_folder }}"
     {{ py_include_dir }}
