@@ -75,8 +75,8 @@ class Pkg(ConanFile):
     exports_sources = "StandardProjectSettings.cmake"
 
     def package(self):
-        copy(self, "StandardProjectSettings.cmake", "cmake")
+        copy(self, "StandardProjectSettings.cmake", src = self.export_sources_folder, dst = path.join(self.package_folder, "share", "cmake"))
 
     def package_info(self):
         self.cpp_info.set_property("name", "umbase")
-        self.cpp_info.set_property("cmake_build_modules", [path.join("cmake", "StandardProjectSettings.cmake")])
+        self.cpp_info.set_property("cmake_build_modules", [path.join("share", "cmake", "StandardProjectSettings.cmake")])
