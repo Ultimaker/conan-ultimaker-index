@@ -12,7 +12,7 @@ class Pkg(ConanFile):
     exports_sources = "StandardProjectSettings.cmake"
 
     def package(self):
-        copy(self, "StandardProjectSettings.cmake", src = self.export_sources_folder, dst = path.join(self.package_folder, "share", "cmake"))
+        copy(self, "StandardProjectSettings.cmake", src = self.export_sources_folder, dst = path.join(self.package_folder, "res", "cmake"))
 
     def package_info(self):
         self.cpp_info.includedirs = []
@@ -20,4 +20,4 @@ class Pkg(ConanFile):
         self.cpp_info.bindirs = []
 
         self.cpp_info.set_property("name", "standardprojectsettings")
-        self.cpp_info.set_property("cmake_build_modules", [path.join("share", "cmake", "StandardProjectSettings.cmake")])
+        self.cpp_info.set_property("cmake_build_modules", [path.join("res", "cmake", "StandardProjectSettings.cmake")])
