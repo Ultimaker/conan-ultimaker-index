@@ -1,5 +1,9 @@
 include(GNUInstallDirs) # Standard install dirs
 
+# Generate compile_commands.json to make it easier to work with clang based tools
+message(STATUS "Generating compile commands to ${CMAKE_CURRENT_BINARY_DIR}/compile_commands.json")
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # Ultimaker uniform Thread linking method
 function(use_threads project_name)
     message(STATUS "Enabling threading support for ${project_name}")
@@ -85,6 +89,22 @@ function(set_project_warnings project_name)
         target_compile_options(${project_name} INTERFACE ${PROJECT_WARNINGS})
     else()
         target_compile_options(${project_name} PRIVATE ${PROJECT_WARNINGS})
+    endif()
+endfunction()
+
+# This function will prevent in-source builds
+function(AssureOutOfSourceBuilds)
+    # make sure the user doesn't play dirty with symlinks
+    get_filename_component(srcdir "${CMAKE_SOURCE_DIR}" REALPATH)
+    get_filename_component(bindir "${CMAKE_BINARY_DIR}" REALPATH)
+
+    # disallow in-source builds
+    if("${srcdir}" STREQUAL "${bindir}")
+        message("######################################################")
+        message("Warning: in-source builds are disabled")
+        message("Please create a separate build directory and run cmake from there")
+        message("######################################################")
+        message(FATAL_ERROR "Quitting configuration")
     endif()
 endfunction()
 
