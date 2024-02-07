@@ -7,6 +7,8 @@ on:
     branches:
       - main
       - 'CURA-*'
+      - 'NP-*'
+      - 'PP-*'
 
 permissions:
   contents: read
