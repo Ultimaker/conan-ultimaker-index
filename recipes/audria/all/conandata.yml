@@ -1,0 +1,5 @@
+sources:
+  "cci.20220429":
+    url:
+    - "https://github.com/scaidermern/audria/archive/18963ec93571387c330e0fde677425097c280671.zip"
+    sha256: "9418f94c6b75f03dcb39e2e6447f413af7978146b852a2eeb15449aaf7f3b26f"
