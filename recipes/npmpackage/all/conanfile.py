@@ -11,7 +11,8 @@ def sanitize_version(version):
     return version.replace("+", "-")
 
 
-def generate_package_json(conanfile: ConanFile, entry_point, **kwargs):
+def generate_package_json(conanfile: ConanFile, entry_point, extra_files = [], **kwargs):
+    files = [ str(Path(entry_point).parent), "package.json" ] + extra_files
     package_json = {
         "name": f"@{conanfile.author.lower()}/{conanfile.name.lower()}js",
         "version": f"{sanitize_version(conanfile.version)}",
@@ -24,18 +25,16 @@ def generate_package_json(conanfile: ConanFile, entry_point, **kwargs):
         "author": conanfile.author,
         "license": conanfile.license,
         "keywords": conanfile.topics,
-        "files": [
-            str(Path(entry_point).parent),
-            "package.json"
-        ]
+        "files": files
     }
     package_json |= kwargs
     return package_json
 
 
-def conf_package_json(conanfile: ConanFile, **kwargs):
+def conf_package_json(conanfile: ConanFile, extra_files = [], **kwargs):
     package_json = generate_package_json(conanfile,
                                          os.path.join(conanfile.cpp.package.bindirs[0], conanfile.cpp.package.bin[0]),
+                                         extra_files,
                                          **kwargs)
     conanfile.conf_info.define(f"user.{conanfile.name.lower()}:package_json", package_json)
 
