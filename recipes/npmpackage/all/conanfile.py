@@ -14,6 +14,7 @@ def sanitize_version(version):
 def generate_package_json(conanfile: ConanFile, entry_point, extra_files = [], **kwargs):
     files = [ str(Path(entry_point).parent), "package.json" ] + extra_files
     package_json = {
+        "type": "module",
         "name": f"@{conanfile.author.lower()}/{conanfile.name.lower()}js",
         "version": f"{sanitize_version(conanfile.version)}",
         "description": f"JavaScript / TypeScript bindings for {conanfile.name}, a {conanfile.description}",
