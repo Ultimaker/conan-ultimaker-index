@@ -1,0 +1,31 @@
+--- a/cpp/clipper.cpp
++++ b/cpp/clipper.cpp
+@@ -4149,6 +4149,28 @@
+ 
+   if (m_sinA * m_delta < 0)
+   {
++    //PATCH: inner (concave w.r.t. the offset) corner. When both adjacent edges are long enough
++    //to contain the point where the two offset edges intersect, emit that single intersection
++    //point instead of the 3-point loop through the source vertex that relied on the final
++    //union to be resolved (and left 1-unit stubs after integer rounding).
++    {
++      //vertex on the other side of j than k (open paths are walked forward then backward)
++      const int size = (int)m_srcPoly.size();
++      const int n = ((k + 1) % size == j) ? (j + 1) % size : (j + size - 1) % size;
++      double r = 1 + (m_normals[j].X * m_normals[k].X + m_normals[j].Y * m_normals[k].Y);
++      if (r > 0.1)
++      {
++        double reach = std::fabs(m_delta * m_sinA / r); //distance from vertex to the foot of the intersection, along each edge
++        double lenK = std::hypot((double)(m_srcPoly[j].X - m_srcPoly[k].X), (double)(m_srcPoly[j].Y - m_srcPoly[k].Y));
++        double lenJ = std::hypot((double)(m_srcPoly[n].X - m_srcPoly[j].X), (double)(m_srcPoly[n].Y - m_srcPoly[j].Y));
++        if (reach <= 0.5 * lenK && reach <= 0.5 * lenJ)
++        {
++          DoMiter(j, k, r);
++          k = j;
++          return;
++        }
++      }
++    }
+     m_destPoly.push_back(IntPoint(Round(m_srcPoly[j].X + m_normals[k].X * m_delta),
+       Round(m_srcPoly[j].Y + m_normals[k].Y * m_delta)));
+     m_destPoly.push_back(m_srcPoly[j]);
