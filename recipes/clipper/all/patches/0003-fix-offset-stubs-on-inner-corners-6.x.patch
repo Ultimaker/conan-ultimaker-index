@@ -1,6 +1,6 @@
 --- a/cpp/clipper.cpp
 +++ b/cpp/clipper.cpp
-@@ -4149,6 +4149,26 @@
+@@ -4149,6 +4149,28 @@
  
    if (m_sinA * m_delta < 0)
    {
@@ -9,7 +9,9 @@
 +    //point instead of the 3-point loop through the source vertex that relied on the final
 +    //union to be resolved (and left 1-unit stubs after integer rounding).
 +    {
-+      const int n = (j + 1) % (int)m_srcPoly.size(); //next vertex, wrapping around for closed paths
++      //vertex on the other side of j than k (open paths are walked forward then backward)
++      const int size = (int)m_srcPoly.size();
++      const int n = ((k + 1) % size == j) ? (j + 1) % size : (j + size - 1) % size;
 +      double r = 1 + (m_normals[j].X * m_normals[k].X + m_normals[j].Y * m_normals[k].Y);
 +      if (r > 0.1)
 +      {
